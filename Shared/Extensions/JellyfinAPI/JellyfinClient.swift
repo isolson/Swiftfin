@@ -49,7 +49,7 @@ extension JellyfinClient.Configuration {
             .unicodeScalars
             .filter { CharacterSet.urlQueryAllowed.contains($0) }
             .description
-        let deviceID = "\(UIDevice.platform)_\(UIDevice.vendorUUIDString)"
+        let deviceID = "\(UIDevice.platform)_\(UIDevice.persistedDeviceID)"
         let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.1"
 
         return .init(

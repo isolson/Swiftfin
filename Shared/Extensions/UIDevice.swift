@@ -14,6 +14,22 @@ extension UIDevice {
         current.identifierForVendor!.uuidString
     }
 
+    /// A unique device identifier persisted in local `UserDefaults`.
+    ///
+    /// Unlike `identifierForVendor`, this is guaranteed to be unique per
+    /// physical device even when multiple Apple TVs share the same iCloud account.
+    static var persistedDeviceID: String {
+        let key = "swiftfin-persisted-device-id"
+
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
+        }
+
+        let id = UUID().uuidString
+        UserDefaults.standard.set(id, forKey: key)
+        return id
+    }
+
     static var isPad: Bool {
         current.userInterfaceIdiom == .pad
     }
