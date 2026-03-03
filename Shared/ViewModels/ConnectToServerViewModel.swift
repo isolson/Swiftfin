@@ -157,6 +157,10 @@ final class ConnectToServerViewModel: ViewModel {
         }
 
         StoredValues[.Server.publicInfo(id: server.id)] = publicInfo
+
+        #if os(tvOS)
+        Container.shared.cloudCredentialSync().pushServers()
+        #endif
     }
 
     // server has same id, but (possible) new URL

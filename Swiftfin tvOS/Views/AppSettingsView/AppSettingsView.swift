@@ -18,6 +18,8 @@ struct AppSettingsView: View {
 
     @Default(.appAppearance)
     private var appearance
+    @Default(.iCloudSync)
+    private var iCloudSync
 
     @Router
     private var router
@@ -85,6 +87,14 @@ struct AppSettingsView: View {
                 }
 
                 SignOutIntervalSection()
+
+                Section {
+                    Toggle(L10n.iCloudSync, isOn: $iCloudSync)
+                } header: {
+                    L10n.iCloud.text
+                } footer: {
+                    L10n.iCloudSyncFooter.text
+                }
 
                 ChevronButton(L10n.logs) {
                     router.route(to: .log)

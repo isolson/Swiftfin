@@ -121,6 +121,10 @@ extension Notifications.Key {
         Key("didSignOut")
     }
 
+    static var didSyncCloudCredentials: Key<Void> {
+        Key("didSyncCloudCredentials")
+    }
+
     // MARK: - App Flow
 
     static var processDeepLink: Key<Void> {

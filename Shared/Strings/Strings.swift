@@ -740,6 +740,12 @@ internal enum L10n {
   internal static let identify = L10n.tr("Localizable", "identify", fallback: "Identify")
   /// Idle
   internal static let idle = L10n.tr("Localizable", "idle", fallback: "Idle")
+  /// iCloud
+  internal static let iCloud = L10n.tr("Localizable", "iCloud", fallback: "iCloud")
+  /// iCloud Sync
+  internal static let iCloudSync = L10n.tr("Localizable", "iCloudSync", fallback: "iCloud Sync")
+  /// Sync server connections, credentials, and preferences across Apple TVs on the same iCloud account.
+  internal static let iCloudSyncFooter = L10n.tr("Localizable", "iCloudSyncFooter", fallback: "Sync server connections, credentials, and preferences across Apple TVs on the same iCloud account.")
   /// Illustrator
   internal static let illustrator = L10n.tr("Localizable", "illustrator", fallback: "Illustrator")
   /// Images
