@@ -12,8 +12,6 @@ import JellyfinAPI
 import Logging
 import SwiftUI
 
-// TODO: remove
-
 struct NativeVideoPlayer: View {
 
     @Environment(\.presentationCoordinator)

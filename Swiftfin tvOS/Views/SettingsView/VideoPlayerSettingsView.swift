@@ -11,9 +11,6 @@ import SwiftUI
 
 struct VideoPlayerSettingsView: View {
 
-    @Default(.VideoPlayer.Subtitle.subtitleFontName)
-    private var subtitleFontName
-
     @Default(.VideoPlayer.jumpBackwardInterval)
     private var jumpBackwardLength
     @Default(.VideoPlayer.jumpForwardInterval)
@@ -21,10 +18,6 @@ struct VideoPlayerSettingsView: View {
     @Default(.VideoPlayer.resumeOffset)
     private var resumeOffset
 
-    @Router
-    private var router
-
-    // TODO: Update with correct settings once the tvOS PlayerUI is complete
     var body: some View {
         Form(systemImage: "tv") {
 
@@ -45,16 +38,6 @@ struct VideoPlayerSettingsView: View {
                 Text(L10n.resume)
             } footer: {
                 Text(L10n.resumeOffsetDescription)
-            }
-
-            Section {
-                ChevronButton(L10n.subtitleFont, subtitle: subtitleFontName) {
-                    router.route(to: .fontPicker(selection: $subtitleFontName))
-                }
-            } header: {
-                Text(L10n.subtitles)
-            } footer: {
-                Text(L10n.subtitlesDisclaimer)
             }
         }
         .navigationTitle(L10n.videoPlayer)
