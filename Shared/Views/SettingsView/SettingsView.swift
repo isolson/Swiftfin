@@ -122,6 +122,10 @@ struct SettingsView: View {
             }
         } learnMore: {
             LabeledContent(
+                L10n.auto,
+                value: L10n.playerAutoDescription
+            )
+            LabeledContent(
                 "Swiftfin",
                 value: L10n.playerSwiftfinDescription
             )

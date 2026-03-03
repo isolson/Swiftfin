@@ -98,11 +98,22 @@ struct VideoPlayerViewShim: View {
     @State
     private var safeAreaInsets: EdgeInsets = .init()
 
-    let manager: MediaPlayerManager
+    @ObservedObject
+    var manager: MediaPlayerManager
+
+    private var effectivePlayerType: VideoPlayerType {
+        if let resolved = manager.playbackItem?.resolvedVideoPlayerType {
+            return resolved
+        }
+        let setting = Defaults[.VideoPlayer.videoPlayerType]
+        return setting == .auto ? .native : setting
+    }
 
     var body: some View {
         Group {
-            if Defaults[.VideoPlayer.videoPlayerType] == .swiftfin {
+            if manager.playbackItem == nil {
+                ProgressView()
+            } else if effectivePlayerType == .swiftfin {
                 VideoPlayer()
             } else {
                 NativeVideoPlayer()

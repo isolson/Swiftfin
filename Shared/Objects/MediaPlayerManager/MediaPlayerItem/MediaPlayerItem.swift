@@ -6,6 +6,7 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import Defaults
 import JellyfinAPI
 import SwiftUI
 
@@ -59,6 +60,7 @@ class MediaPlayerItem: ViewModel, MediaPlayerObserver {
     let videoStreams: [MediaStream]
 
     let requestedBitrate: PlaybackBitrate
+    let resolvedVideoPlayerType: VideoPlayerType
 
     // MARK: init
 
@@ -68,6 +70,7 @@ class MediaPlayerItem: ViewModel, MediaPlayerObserver {
         playSessionID: String,
         url: URL,
         requestedBitrate: PlaybackBitrate = .max,
+        resolvedVideoPlayerType: VideoPlayerType = Defaults[.VideoPlayer.videoPlayerType],
         previewImageProvider: (any PreviewImageProvider)? = nil,
         thumbnailProvider: ThumbnailProvider? = nil
     ) {
@@ -75,6 +78,7 @@ class MediaPlayerItem: ViewModel, MediaPlayerObserver {
         self.mediaSource = mediaSource
         self.playSessionID = playSessionID
         self.requestedBitrate = requestedBitrate
+        self.resolvedVideoPlayerType = resolvedVideoPlayerType
         self.previewImageProvider = previewImageProvider
         self.thumbnailProvider = thumbnailProvider
         self.url = url
