@@ -6,14 +6,13 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import CollectionHStack
 import Foundation
 import JellyfinAPI
 import SwiftUI
 
 extension SeriesEpisodeSelector {
 
-    struct EpisodeHStack: View {
+    struct EpisodeVStack: View {
 
         @EnvironmentObject
         private var focusGuide: FocusGuide
@@ -29,36 +28,30 @@ extension SeriesEpisodeSelector {
         @State
         private var lastFocusedEpisodeID: String?
 
-        @StateObject
-        private var proxy = CollectionHStackProxy()
-
         let playButtonItem: BaseItemDto?
 
         // MARK: - Content View
 
         private func contentView(viewModel: SeasonItemViewModel) -> some View {
-            CollectionHStack(
-                uniqueElements: viewModel.elements,
-                id: \.unwrappedIDHashOrZero,
-                columns: 3.5
-            ) { episode in
-                SeriesEpisodeSelector.EpisodeCard(episode: episode)
-                    .focused($focusedEpisodeID, equals: episode.id)
-                    .padding(.horizontal, 4)
-            }
-            .scrollBehavior(.continuousLeadingEdge)
-            .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
-            .proxy(proxy)
-            .onFirstAppear {
-                guard !didScrollToPlayButtonItem else { return }
-                didScrollToPlayButtonItem = true
+            ScrollViewReader { proxy in
+                VStack(spacing: EdgeInsets.edgePadding / 2) {
+                    ForEach(viewModel.elements, id: \.id) { episode in
+                        SeriesEpisodeSelector.EpisodeRowCard(episode: episode)
+                            .id(episode.id)
+                            .focused($focusedEpisodeID, equals: episode.id)
+                    }
+                }
+                .padding(.horizontal, EdgeInsets.edgePadding)
+                .onFirstAppear {
+                    guard !didScrollToPlayButtonItem else { return }
+                    didScrollToPlayButtonItem = true
 
-                lastFocusedEpisodeID = playButtonItem?.id
+                    lastFocusedEpisodeID = playButtonItem?.id
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    guard let playButtonItem else { return }
-                    proxy.scrollTo(id: playButtonItem.unwrappedIDHashOrZero, animated: false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        guard let playButtonItem else { return }
+                        proxy.scrollTo(playButtonItem.id, anchor: .top)
+                    }
                 }
             }
         }
@@ -95,20 +88,20 @@ extension SeriesEpisodeSelector {
 
         var body: some View {
             ZStack {
-                PlaceholderHStack()
+                PlaceholderContent()
 
                 Group {
                     switch viewModel.state {
                     case .content:
                         if viewModel.elements.isEmpty {
-                            EmptyHStack(focusedEpisodeID: $focusedEpisodeID)
+                            EmptyContent(focusedEpisodeID: $focusedEpisodeID)
                         } else {
                             contentView(viewModel: viewModel)
                         }
                     case let .error(error):
-                        ErrorHStack(viewModel: viewModel, error: error, focusedEpisodeID: $focusedEpisodeID)
+                        ErrorContent(viewModel: viewModel, error: error, focusedEpisodeID: $focusedEpisodeID)
                     case .initial, .refreshing:
-                        LoadingHStack(focusedEpisodeID: $focusedEpisodeID)
+                        LoadingContent(focusedEpisodeID: $focusedEpisodeID)
                     }
                 }.transition(.opacity.animation(.linear(duration: 0.1)))
             }
@@ -136,31 +129,33 @@ extension SeriesEpisodeSelector {
             }
         }
     }
+}
 
-    // MARK: - Empty HStack
+// MARK: - State Sub-Views
 
-    struct EmptyHStack: View {
+extension SeriesEpisodeSelector.EpisodeVStack {
+
+    // MARK: - Empty Content
+
+    struct EmptyContent: View {
 
         let focusedEpisodeID: FocusState<String?>.Binding
 
         var body: some View {
-            CollectionHStack(
-                count: 1,
-                columns: 3.5
-            ) { _ in
+            HStack {
                 SeriesEpisodeSelector.EmptyCard()
                     .focused(focusedEpisodeID, equals: "emptyCard")
-                    .padding(.horizontal, 4)
+                    .frame(maxWidth: 400)
+
+                Spacer()
             }
-            .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
-            .scrollDisabled(true)
+            .padding(.horizontal, EdgeInsets.edgePadding)
         }
     }
 
-    // MARK: - Error HStack
+    // MARK: - Error Content
 
-    struct ErrorHStack: View {
+    struct ErrorContent: View {
 
         @ObservedObject
         var viewModel: SeasonItemViewModel
@@ -169,61 +164,52 @@ extension SeriesEpisodeSelector {
         let focusedEpisodeID: FocusState<String?>.Binding
 
         var body: some View {
-            CollectionHStack(
-                count: 1,
-                columns: 3.5
-            ) { _ in
+            HStack {
                 SeriesEpisodeSelector.ErrorCard(error: error)
                     .onSelect {
                         viewModel.send(.refresh)
                     }
                     .focused(focusedEpisodeID, equals: "errorCard")
-                    .padding(.horizontal, 4)
+                    .frame(maxWidth: 400)
+
+                Spacer()
             }
-            .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
-            .scrollDisabled(true)
+            .padding(.horizontal, EdgeInsets.edgePadding)
         }
     }
 
-    // MARK: - Loading HStack
+    // MARK: - Loading Content
 
-    struct LoadingHStack: View {
+    struct LoadingContent: View {
 
         let focusedEpisodeID: FocusState<String?>.Binding
 
         var body: some View {
-            CollectionHStack(
-                count: 1,
-                columns: 3.5
-            ) { _ in
+            HStack {
                 SeriesEpisodeSelector.LoadingCard()
                     .focused(focusedEpisodeID, equals: "loadingCard")
-                    .padding(.horizontal, 4)
+                    .frame(maxWidth: 400)
+
+                Spacer()
             }
-            .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
-            .scrollDisabled(true)
+            .padding(.horizontal, EdgeInsets.edgePadding)
         }
     }
 
-    // MARK: - Placeholder HStack
+    // MARK: - Placeholder Content
 
-    struct PlaceholderHStack: View {
+    struct PlaceholderContent: View {
 
         var body: some View {
-            CollectionHStack(
-                count: 1,
-                columns: 3.5
-            ) { _ in
+            HStack {
                 SeriesEpisodeSelector.EmptyCard()
-                    .padding(.horizontal, 4)
+                    .frame(maxWidth: 400)
+
+                Spacer()
             }
-            .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
+            .padding(.horizontal, EdgeInsets.edgePadding)
             .opacity(0)
             .allowsHitTesting(false)
-            .scrollDisabled(true)
         }
     }
 }
