@@ -9,6 +9,25 @@
 import JellyfinAPI
 import SwiftUI
 
+private struct NoHighlightButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+    }
+}
+
+private struct FocusedBackground: View {
+
+    @Environment(\.isFocused)
+    private var isFocused
+
+    var body: some View {
+        if isFocused {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.15))
+        }
+    }
+}
+
 extension SeriesEpisodeSelector {
 
     struct EpisodeRowCard: View {
@@ -59,8 +78,14 @@ extension SeriesEpisodeSelector {
             }
         }
 
+        private var metadataLabel: String? {
+            let parts = [episode.runTimeLabel, episode.airDateLabel, episode.officialRating]
+                .compactMap(\.self)
+            return parts.isEmpty ? nil : parts.joined(separator: " • ")
+        }
+
         var body: some View {
-            HStack(alignment: .top, spacing: EdgeInsets.edgePadding) {
+            HStack(alignment: .center, spacing: EdgeInsets.edgePadding) {
                 Button {
                     router.route(
                         to: .videoPlayer(
@@ -79,21 +104,49 @@ extension SeriesEpisodeSelector {
 
                         thumbnailOverlay
                     }
-                    .posterStyle(.landscape)
                 }
                 .buttonStyle(.card)
                 .posterShadow()
+                .posterStyle(.landscape, contentMode: .fit)
                 .frame(width: 300)
                 .focused($isFocused)
 
-                SeriesEpisodeSelector.EpisodeContent(
-                    subHeader: episode.episodeLocator ?? .emptyDash,
-                    header: episode.displayTitle,
-                    content: episodeContent
-                )
-                .onSelect {
+                Button {
                     router.route(to: .item(item: episode))
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(
+                            [episode.seasonEpisodeLabel, episode.displayTitle]
+                                .compactMap(\.self)
+                                .joined(separator: " - ")
+                        )
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                        Text(episodeContent)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(3)
+
+                        if let metadataLabel {
+                            Text(metadataLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(EdgeInsets.edgePadding / 2)
+                    .background {
+                        FocusedBackground()
+                    }
                 }
+                .buttonStyle(NoHighlightButtonStyle())
+                .frame(maxWidth: 800, alignment: .leading)
+
+                Spacer()
             }
         }
     }
