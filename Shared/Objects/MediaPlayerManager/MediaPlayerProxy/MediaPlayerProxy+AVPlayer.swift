@@ -127,7 +127,8 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
             let options = group.options
 
             if let languageCode = stream.language,
-               let match = options.first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
+               let match = options
+                   .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
             {
                 currentItem.select(match, in: group)
             } else if let index = stream.index, index >= 0, index < options.count {
@@ -151,7 +152,8 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
             let options = group.options
 
             if let languageCode = stream.language,
-               let match = options.first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
+               let match = options
+                   .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
             {
                 currentItem.select(match, in: group)
             } else if index < options.count {

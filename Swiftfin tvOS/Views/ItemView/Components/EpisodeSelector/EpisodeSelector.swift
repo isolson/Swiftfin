@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import CollectionHStack
 import JellyfinAPI
 import SwiftUI
 
@@ -41,7 +40,7 @@ struct SeriesEpisodeSelector: View {
                 .environmentObject(parentFocusGuide)
 
             if let selectionViewModel {
-                EpisodeHStack(viewModel: selectionViewModel, playButtonItem: viewModel.playButtonItem)
+                EpisodeVStack(viewModel: selectionViewModel, playButtonItem: viewModel.playButtonItem)
                     .environmentObject(parentFocusGuide)
             }
         }
