@@ -28,8 +28,10 @@ struct SettingsView: View {
     #endif
     private var accentColor
 
+    #if os(iOS)
     @Default(.VideoPlayer.videoPlayerType)
     private var videoPlayerType
+    #endif
 
     @StateObject
     private var viewModel = SettingsViewModel()
@@ -109,8 +111,6 @@ struct SettingsView: View {
             ChevronButton(L10n.nativePlayer) {
                 router.route(to: .nativePlayerSettings)
             }
-            #else
-            ListRowMenu(L10n.videoPlayerType, selection: $videoPlayerType)
             #endif
 
             ChevronButton(L10n.videoPlayer) {

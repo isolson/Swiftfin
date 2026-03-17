@@ -111,6 +111,9 @@ struct VideoPlayerViewShim: View {
 
     var body: some View {
         Group {
+            #if os(tvOS)
+            NativeVideoPlayer()
+            #else
             if manager.playbackItem == nil {
                 ProgressView()
             } else if effectivePlayerType == .swiftfin {
@@ -118,6 +121,7 @@ struct VideoPlayerViewShim: View {
             } else {
                 NativeVideoPlayer()
             }
+            #endif
         }
         .colorScheme(.dark) // use over `preferredColorScheme(.dark)` to not have destination change
         .environment(\.safeAreaInsets, safeAreaInsets)

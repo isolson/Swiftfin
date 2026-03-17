@@ -10,6 +10,88 @@ import SwiftUI
 
 extension SeriesEpisodeSelector {
 
+    struct SeasonsVStack: View {
+
+        // MARK: - Environment & Observed Objects
+
+        @EnvironmentObject
+        private var focusGuide: FocusGuide
+
+        @ObservedObject
+        var viewModel: SeriesItemViewModel
+
+        // MARK: - Selection Binding
+
+        @Binding
+        var selection: SeasonItemViewModel.ID?
+
+        // MARK: - Focus Variables
+
+        @FocusState
+        private var focusedSeason: SeasonItemViewModel.ID?
+
+        @State
+        private var didScrollToPlayButtonSeason = false
+
+        // MARK: - Body
+
+        var body: some View {
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(viewModel.seasons) { season in
+                            seasonButton(season: season)
+                                .id(season.id)
+                        }
+                    }
+                    .padding(.vertical, EdgeInsets.edgePadding)
+                }
+                .frame(width: 220)
+                .focusSection()
+                .focusGuide(
+                    focusGuide,
+                    tag: "belowHeader",
+                    onContentFocus: { focusedSeason = selection },
+                    top: "header",
+                    right: "episodes"
+                )
+                .onChange(of: focusedSeason) { _, newValue in
+                    if let newValue {
+                        selection = newValue
+                    }
+                }
+                .onFirstAppear {
+                    guard !didScrollToPlayButtonSeason else { return }
+                    didScrollToPlayButtonSeason = true
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        guard let selection else { return }
+                        proxy.scrollTo(selection, anchor: .top)
+                    }
+                }
+            }
+        }
+
+        // MARK: - Season Button
+
+        @ViewBuilder
+        private func seasonButton(season: SeasonItemViewModel) -> some View {
+            Button {
+                selection = season.id
+            } label: {
+                Text(season.season.displayTitle.uppercased())
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(selection == season.id ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, EdgeInsets.edgePadding)
+            }
+            .focused($focusedSeason, equals: season.id)
+            .buttonStyle(.plain)
+        }
+    }
+
     struct SeasonsHStack: View {
 
         // MARK: - Environment & Observed Objects

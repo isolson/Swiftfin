@@ -21,7 +21,13 @@ extension MediaPlayerItem {
     static func build(
         for initialItem: BaseItemDto,
         mediaSource _initialMediaSource: MediaSourceInfo? = nil,
-        videoPlayerType: VideoPlayerType = Defaults[.VideoPlayer.videoPlayerType],
+        videoPlayerType: VideoPlayerType = {
+            #if os(tvOS)
+            return .native
+            #else
+            return Defaults[.VideoPlayer.videoPlayerType]
+            #endif
+        }(),
         requestedBitrate: PlaybackBitrate = Defaults[.VideoPlayer.Playback.appMaximumBitrate],
         compatibilityMode: PlaybackCompatibility = Defaults[.VideoPlayer.Playback.compatibilityMode],
         modifyItem: ((inout BaseItemDto) -> Void)? = nil

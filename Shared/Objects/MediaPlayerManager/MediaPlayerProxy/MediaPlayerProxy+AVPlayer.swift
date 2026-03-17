@@ -13,11 +13,7 @@ import Foundation
 import JellyfinAPI
 import SwiftUI
 
-// TODO: After NativeVideoPlayer is removed, can move bindings and
-//       observers to AVPlayerView, like the VLC delegate
-//       - wouldn't need to have MediaPlayerProxy: MediaPlayerObserver
 // TODO: report playback information, see VLCUI.PlaybackInformation (dropped frames, etc.)
-// TODO: report buffering state
 // TODO: have set seconds with completion handler
 
 @MainActor
@@ -35,6 +31,7 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
     private var statusObserver: NSKeyValueObservation!
     private var timeControlStatusObserver: NSKeyValueObservation!
     private var timeObserver: Any!
+    private var endOfPlaybackObserver: NSObjectProtocol?
     private var managerItemObserver: AnyCancellable?
     private var managerStateObserver: AnyCancellable?
 
@@ -118,10 +115,52 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
-    // TODO: complete
-    func setRate(_ rate: Float) {}
-    func setAudioStream(_ stream: MediaStream) {}
-    func setSubtitleStream(_ stream: MediaStream) {}
+    func setRate(_ rate: Float) {
+        player.rate = rate
+    }
+
+    func setAudioStream(_ stream: MediaStream) {
+        guard let currentItem = player.currentItem else { return }
+
+        Task {
+            guard let group = try? await currentItem.asset.loadMediaSelectionGroup(for: .audible) else { return }
+            let options = group.options
+
+            if let languageCode = stream.language,
+               let match = options
+                   .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
+            {
+                currentItem.select(match, in: group)
+            } else if let index = stream.index, index >= 0, index < options.count {
+                currentItem.select(options[index], in: group)
+            }
+        }
+    }
+
+    func setSubtitleStream(_ stream: MediaStream) {
+        guard let currentItem = player.currentItem else { return }
+
+        Task {
+            guard let group = try? await currentItem.asset.loadMediaSelectionGroup(for: .legible) else { return }
+
+            // nil or -1 index means disable subtitles
+            guard let index = stream.index, index >= 0 else {
+                currentItem.select(nil, in: group)
+                return
+            }
+
+            let options = group.options
+
+            if let languageCode = stream.language,
+               let match = options
+                   .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
+            {
+                currentItem.select(match, in: group)
+            } else if index < options.count {
+                currentItem.select(options[index], in: group)
+            }
+        }
+    }
 
     func setAspectFill(_ aspectFill: Bool) {
         avPlayerLayer.videoGravity = aspectFill ? .resizeAspectFill : .resizeAspect
@@ -145,6 +184,11 @@ extension AVMediaPlayerProxy {
             }
         }
 
+        if let endOfPlaybackObserver {
+            NotificationCenter.default.removeObserver(endOfPlaybackObserver)
+            self.endOfPlaybackObserver = nil
+        }
+
         if let statusObserver {
             statusObserver.invalidate()
             self.statusObserver = nil
@@ -159,10 +203,24 @@ extension AVMediaPlayerProxy {
     private func playNew(item: MediaPlayerItem) {
         let baseItem = item.baseItem
 
+        if let endOfPlaybackObserver {
+            NotificationCenter.default.removeObserver(endOfPlaybackObserver)
+        }
+
         let newAVPlayerItem = AVPlayerItem(url: item.url)
         newAVPlayerItem.externalMetadata = item.baseItem.avMetadata
 
         player.replaceCurrentItem(with: newAVPlayerItem)
+
+        endOfPlaybackObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: newAVPlayerItem,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.manager?.ended()
+            }
+        }
 
         // TODO: protect against paused
 //        rateObserver = player.observe(\.rate, options: [.new, .initial]) { _, value in
