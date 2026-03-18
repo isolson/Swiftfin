@@ -181,14 +181,10 @@ extension SeriesEpisodeSelector {
                 Marquee(season.season.displayTitle, animateWhenFocused: true)
                     .frame(maxWidth: 300)
                     .font(.headline)
-                    .fontWeight(.semibold)
+                    .fontWeight(selection == season.id ? .bold : .regular)
+                    .foregroundStyle(selection == season.id ? .primary : .secondary)
                     .padding(.vertical, 10)
-                    .padding(.horizontal, 20)
-                    .if(selection == season.id) { text in
-                        text
-                            .background(.white)
-                            .foregroundColor(.black)
-                    }
+                    .padding(.horizontal, 16)
             }
             .focused($focusedSeason, equals: season.id)
             .buttonStyle(.card)

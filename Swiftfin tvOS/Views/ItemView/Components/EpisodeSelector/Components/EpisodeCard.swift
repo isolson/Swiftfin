@@ -21,15 +21,56 @@ extension SeriesEpisodeSelector {
         @FocusState
         private var isFocused: Bool
 
+        // MARK: - Duration Label
+
+        private var durationLabel: String? {
+            if let progressLabel = episode.progressLabel {
+                return progressLabel
+            }
+            return episode.runTimeLabel
+        }
+
+        // MARK: - Duration Badge Overlay
+
+        @ViewBuilder
+        private var durationBadge: some View {
+            if let durationLabel {
+                ZStack(alignment: .bottomLeading) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(0.6), location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    HStack(spacing: 4) {
+                        if episode.progressLabel != nil {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption2)
+                        } else {
+                            Image(systemName: "play.fill")
+                                .font(.caption2)
+                        }
+
+                        Text(durationLabel)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                    .padding(10)
+                }
+            }
+        }
+
+        // MARK: - Thumbnail Overlay
+
         @ViewBuilder
         private var overlayView: some View {
             ZStack {
-                if let progressLabel = episode.progressLabel {
-                    LandscapePosterProgressBar(
-                        title: progressLabel,
-                        progress: (episode.userData?.playedPercentage ?? 0) / 100
-                    )
-                } else if episode.userData?.isPlayed ?? false {
+                if episode.userData?.isPlayed ?? false {
                     ZStack(alignment: .bottomTrailing) {
                         Color.clear
 
@@ -40,16 +81,22 @@ extension SeriesEpisodeSelector {
                             .foregroundStyle(.white, .black)
                             .padding()
                     }
+                } else if !isFocused {
+                    durationBadge
                 }
 
                 if isFocused {
+                    Color.black.opacity(0.3)
+
                     Image(systemName: "play.fill")
                         .resizable()
                         .frame(width: 50, height: 50)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white)
                 }
             }
         }
+
+        // MARK: - Episode Content
 
         private var episodeContent: String {
             if episode.isUnaired {
@@ -58,6 +105,15 @@ extension SeriesEpisodeSelector {
                 episode.overview ?? L10n.noOverviewAvailable
             }
         }
+
+        private var episodeLabel: String {
+            if let indexNumber = episode.indexNumber {
+                return L10n.episodeNumber(indexNumber).uppercased()
+            }
+            return episode.episodeLocator?.uppercased() ?? .emptyDash
+        }
+
+        // MARK: - Body
 
         var body: some View {
             VStack(alignment: .leading) {
@@ -86,14 +142,17 @@ extension SeriesEpisodeSelector {
                 .focused($isFocused)
 
                 SeriesEpisodeSelector.EpisodeContent(
-                    subHeader: episode.episodeLocator ?? .emptyDash,
+                    subHeader: episodeLabel,
                     header: episode.displayTitle,
-                    content: episodeContent
+                    content: episodeContent,
+                    airDate: episode.premiereDateLabel,
+                    rating: episode.officialRating
                 )
                 .onSelect {
                     router.route(to: .item(item: episode))
                 }
             }
+            .focusedValue(\.focusedPoster, AnyPoster(episode))
         }
     }
 }

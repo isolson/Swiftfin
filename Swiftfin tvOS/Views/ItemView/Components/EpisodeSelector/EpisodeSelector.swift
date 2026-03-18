@@ -40,7 +40,10 @@ struct SeriesEpisodeSelector: View {
                 .environmentObject(parentFocusGuide)
 
             if let selectionViewModel {
-                EpisodeVStack(viewModel: selectionViewModel, playButtonItem: viewModel.playButtonItem)
+                EpisodeHStack(viewModel: selectionViewModel, playButtonItem: viewModel.playButtonItem, seriesItem: viewModel.item)
+                    .id(selectionViewModel.id)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.3), value: selection)
                     .environmentObject(parentFocusGuide)
             }
         }

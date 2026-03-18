@@ -40,7 +40,9 @@ extension SeriesEpisodeSelector {
                 SeriesEpisodeSelector.EpisodeContent(
                     subHeader: String.random(count: 7 ..< 12),
                     header: String.random(count: 10 ..< 20),
-                    content: String.random(count: 20 ..< 80)
+                    content: String.random(count: 20 ..< 80),
+                    airDate: String.random(count: 8 ..< 14),
+                    rating: String.random(count: 4 ..< 6)
                 )
                 .redacted(reason: .placeholder)
             }

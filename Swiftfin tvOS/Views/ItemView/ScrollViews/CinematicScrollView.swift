@@ -19,6 +19,9 @@ extension ItemView {
         @StateObject
         private var focusGuide = FocusGuide()
 
+        @StateObject
+        private var cinematicProxy = CinematicBackgroundView.Proxy()
+
         private let content: Content
 
         init(
@@ -29,9 +32,7 @@ extension ItemView {
             self.content = content()
         }
 
-        private func withBackgroundImageSource(
-            @ViewBuilder content: @escaping (ImageSource) -> some View
-        ) -> some View {
+        private var initialBackgroundImageSource: ImageSource {
             let item: BaseItemDto = if viewModel.item.type == .person || viewModel.item.type == .musicArtist,
                                        let typeViewModel = viewModel as? CollectionItemViewModel,
                                        let randomItem = typeViewModel.randomItem()
@@ -50,18 +51,23 @@ extension ItemView {
                 }
             }()
 
-            let imageSource = item.imageSource(imageType, maxWidth: 1920)
+            return item.imageSource(imageType, maxWidth: 1920)
+        }
 
-            return content(imageSource)
-                .id(imageSource.url?.hashValue)
-                .animation(.linear(duration: 0.1), value: imageSource.url?.hashValue)
+        private var isSeries: Bool {
+            viewModel.item.type == .series
         }
 
         var body: some View {
             GeometryReader { proxy in
                 ZStack {
-                    withBackgroundImageSource { imageSource in
-                        ImageView(imageSource)
+                    ImageView(initialBackgroundImageSource)
+
+                    if isSeries {
+                        CinematicBackgroundView(
+                            viewModel: cinematicProxy,
+                            initialItem: viewModel.item
+                        )
                     }
 
                     ScrollView(.vertical, showsIndicators: false) {
@@ -96,10 +102,14 @@ extension ItemView {
                                 }
                         }
                         .environmentObject(focusGuide)
+                        .environmentObject(cinematicProxy)
                     }
                 }
             }
             .ignoresSafeArea()
+            .onAppear {
+                cinematicProxy.select(item: viewModel.item)
+            }
         }
     }
 }
