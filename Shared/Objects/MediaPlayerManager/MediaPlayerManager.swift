@@ -168,7 +168,7 @@ final class MediaPlayerManager: ViewModel {
         }
     }
 
-    private var itemBuildTask: AnyCancellable?
+    private var itemBuildTask: Task<MediaPlayerItem, Error>?
 
     private var initialMediaPlayerItemProvider: MediaPlayerItemProvider?
 
@@ -190,13 +190,20 @@ final class MediaPlayerManager: ViewModel {
         self.item = item
         self.queue = queue.map { AnyMediaPlayerQueue($0) }
         self.state = .loadingItem
-        self.initialMediaPlayerItemProvider = .init(
+        let provider = MediaPlayerItemProvider(
             item: item,
             function: mediaPlayerItemProvider
         )
+        self.initialMediaPlayerItemProvider = provider
         super.init()
 
         self.queue?.manager = self
+
+        // Start building the playback item immediately so API calls
+        // run concurrently with the navigation transition animation.
+        self.itemBuildTask = Task {
+            try await provider()
+        }
     }
 
     init(
@@ -265,6 +272,8 @@ final class MediaPlayerManager: ViewModel {
 
     @Function(\Action.Cases.playNewItem)
     private func _playNewItem(_ provider: MediaPlayerItemProvider) async throws {
+        itemBuildTask?.cancel()
+        itemBuildTask = nil
         item = provider.item
         setSupplements()
         proxy?.stop()
@@ -294,12 +303,12 @@ final class MediaPlayerManager: ViewModel {
 
     @Function(\Action.Cases.start)
     private func _start() async throws {
-        guard let initialMediaPlayerItemProvider else {
+        guard let itemBuildTask else {
             await self.stop()
             return
         }
         self.initialMediaPlayerItemProvider = nil
-        playbackItem = try await initialMediaPlayerItemProvider()
+        playbackItem = try await itemBuildTask.value
     }
 
     @Function(\Action.Cases.stop)
@@ -309,6 +318,7 @@ final class MediaPlayerManager: ViewModel {
         // TODO: remove playback item?
         //       - check that observers would respond correctly to stopping
         itemBuildTask?.cancel()
+        itemBuildTask = nil
         proxy?.stop()
         Container.shared.mediaPlayerManager.reset()
     }

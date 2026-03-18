@@ -7,6 +7,7 @@
 //
 
 import AVFoundation
+import AVKit
 import Combine
 import Defaults
 import Foundation
@@ -32,6 +33,7 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
     private var timeControlStatusObserver: NSKeyValueObservation!
     private var timeObserver: Any!
     private var endOfPlaybackObserver: NSObjectProtocol?
+    private var loadingTimeoutTask: Task<Void, Never>?
     private var managerItemObserver: AnyCancellable?
     private var managerStateObserver: AnyCancellable?
 
@@ -175,6 +177,7 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
 extension AVMediaPlayerProxy {
 
     private func playbackStopped() {
+        loadingTimeoutTask?.cancel()
         player.pause()
 
         if let timeObserver {
@@ -209,6 +212,7 @@ extension AVMediaPlayerProxy {
 
         let newAVPlayerItem = AVPlayerItem(url: item.url)
         newAVPlayerItem.externalMetadata = item.baseItem.avMetadata
+        newAVPlayerItem.navigationMarkerGroups = Self.navigationMarkerGroups(for: item.baseItem)
 
         player.replaceCurrentItem(with: newAVPlayerItem)
 
@@ -229,7 +233,7 @@ extension AVMediaPlayerProxy {
 //            }
 //        }
 
-        timeControlStatusObserver = player.observe(\.timeControlStatus, options: [.new, .initial]) { player, _ in
+        timeControlStatusObserver = player.observe(\.timeControlStatus, options: [.new]) { player, _ in
             let timeControlStatus = player.timeControlStatus
 
             DispatchQueue.main.async {
@@ -245,18 +249,28 @@ extension AVMediaPlayerProxy {
             }
         }
 
-        // TODO: proper handling of none/unknown states
-        statusObserver = player.observe(\.currentItem?.status, options: [.new, .initial]) { _, value in
+        loadingTimeoutTask?.cancel()
+        loadingTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
+            self?.manager?.error(ErrorMessage("Playback timed out while loading"))
+        }
+
+        statusObserver = player.observe(\.currentItem?.status, options: [.new]) { _, value in
             guard let newValue = value.newValue else { return }
             switch newValue {
             case .failed:
+                self.loadingTimeoutTask?.cancel()
                 if let error = self.player.error {
                     DispatchQueue.main.async {
                         self.manager?.error(ErrorMessage("AVPlayer error: \(error.localizedDescription)"))
                     }
                 }
-            case .none, .readyToPlay, .unknown:
-                let startSeconds = max(.zero, (baseItem.startSeconds ?? .zero) - Duration.seconds(Defaults[.VideoPlayer.resumeOffset]))
+            case .readyToPlay:
+                self.loadingTimeoutTask?.cancel()
+                let resumeSeconds = max(.zero, (baseItem.startSeconds ?? .zero) - Duration.seconds(Defaults[.VideoPlayer.resumeOffset]))
+                let runtime = baseItem.runtime ?? .zero
+                let startSeconds = runtime > .zero ? min(resumeSeconds, runtime - .seconds(1)) : resumeSeconds
 
                 self.player.seek(
                     to: CMTimeMake(
@@ -269,9 +283,38 @@ extension AVMediaPlayerProxy {
                         self.play()
                     }
                 )
+            case .none, .unknown:
+                break
             @unknown default: ()
             }
         }
+    }
+}
+
+// MARK: - Chapter Navigation Markers
+
+extension AVMediaPlayerProxy {
+
+    static func navigationMarkerGroups(for item: BaseItemDto) -> [AVNavigationMarkersGroup] {
+        guard let chapters = item.fullChapterInfo, chapters.isNotEmpty else { return [] }
+
+        let timedGroups: [AVTimedMetadataGroup] = chapters.map { chapter in
+            let chapterInfo = chapter.chapterInfo
+            let startTicks = chapterInfo.startPositionTicks ?? 0
+            let startTime = CMTime(seconds: Double(startTicks) / 10_000_000, preferredTimescale: 1000)
+
+            let titleItem = AVMutableMetadataItem()
+            titleItem.identifier = .commonIdentifierTitle
+            titleItem.value = chapterInfo.displayTitle as NSString
+            titleItem.extendedLanguageTag = "und"
+
+            return AVTimedMetadataGroup(
+                items: [titleItem],
+                timeRange: CMTimeRange(start: startTime, duration: .indefinite)
+            )
+        }
+
+        return [AVNavigationMarkersGroup(title: nil, timedNavigationMarkers: timedGroups)]
     }
 }
 
