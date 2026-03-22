@@ -27,11 +27,13 @@ struct ChannelLibraryView: View {
         ) { channel in
             WideChannelGridItem(channel: channel)
                 .onSelect {
-                    guard let mediaSource = channel.channel.mediaSources?.first else { return }
-//                    router.route(
-//                        to: \.liveVideoPlayer,
-//                        LiveVideoPlayerManager(item: channel.channel, mediaSource: mediaSource)
-//                    )
+                    router.route(
+                        to: .videoPlayer(
+                            provider: channel.channel.getPlaybackItemProvider(
+                                userSession: viewModel.userSession
+                            )
+                        )
+                    )
                 }
         }
         .onReachedBottomEdge(offset: .offset(300)) {

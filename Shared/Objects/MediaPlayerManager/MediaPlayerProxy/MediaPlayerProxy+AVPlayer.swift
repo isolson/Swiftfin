@@ -236,9 +236,10 @@ extension AVMediaPlayerProxy {
                 switch timeControlStatus {
                 case .paused:
                     self.manager?.setPlaybackRequestStatus(status: .paused)
-                case .waitingToPlayAtSpecifiedRate: ()
-                // TODO: buffering
+                case .waitingToPlayAtSpecifiedRate:
+                    self.isBuffering.value = true
                 case .playing:
+                    self.isBuffering.value = false
                     self.manager?.setPlaybackRequestStatus(status: .playing)
                 @unknown default: ()
                 }
@@ -256,19 +257,23 @@ extension AVMediaPlayerProxy {
                     }
                 }
             case .none, .readyToPlay, .unknown:
-                let startSeconds = max(.zero, (baseItem.startSeconds ?? .zero) - Duration.seconds(Defaults[.VideoPlayer.resumeOffset]))
+                if baseItem.isLiveStream {
+                    self.play()
+                } else {
+                    let startSeconds = max(.zero, (baseItem.startSeconds ?? .zero) - Duration.seconds(Defaults[.VideoPlayer.resumeOffset]))
 
-                self.player.seek(
-                    to: CMTimeMake(
-                        value: startSeconds.components.seconds,
-                        timescale: 1
-                    ),
-                    toleranceBefore: .zero,
-                    toleranceAfter: .zero,
-                    completionHandler: { _ in
-                        self.play()
-                    }
-                )
+                    self.player.seek(
+                        to: CMTimeMake(
+                            value: startSeconds.components.seconds,
+                            timescale: 1
+                        ),
+                        toleranceBefore: .zero,
+                        toleranceAfter: .zero,
+                        completionHandler: { _ in
+                            self.play()
+                        }
+                    )
+                }
             @unknown default: ()
             }
         }
