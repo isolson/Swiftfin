@@ -199,13 +199,15 @@ final class CloudCredentialSync {
     func importRemoteData(changedKeys: [String]?) {
         guard Defaults[.iCloudSync] else { return }
 
-        importQueue.sync {
-            guard !isImporting else {
+        let alreadyImporting = importQueue.sync { () -> Bool in
+            if isImporting {
                 logger.info("Skipping overlapping importRemoteData call")
-                return
+                return true
             }
             isImporting = true
+            return false
         }
+        guard !alreadyImporting else { return }
 
         defer {
             importQueue.sync { isImporting = false }
