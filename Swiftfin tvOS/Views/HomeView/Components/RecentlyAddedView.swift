@@ -16,6 +16,15 @@ extension HomeView {
         @Default(.Customization.recentlyAddedPosterType)
         private var recentlyAddedPosterType
 
+        @EnvironmentObject
+        private var cinematicProxy: CinematicBackgroundView.Proxy
+
+        @FocusedValue(\.focusedPoster)
+        private var focusedPoster
+
+        @FocusState
+        private var isSectionFocused
+
         @Router
         private var router
 
@@ -30,6 +39,11 @@ extension HomeView {
                     items: viewModel.elements
                 ) { item in
                     router.route(to: .item(item: item))
+                }
+                .focused($isSectionFocused)
+                .onChange(of: focusedPoster) {
+                    guard let focusedPoster, isSectionFocused else { return }
+                    cinematicProxy.select(item: focusedPoster)
                 }
             }
         }

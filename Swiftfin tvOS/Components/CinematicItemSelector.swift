@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Combine
 import JellyfinAPI
 import SwiftUI
 
@@ -15,14 +14,14 @@ import SwiftUI
 
 struct CinematicItemSelector<Item: Poster>: View {
 
+    @EnvironmentObject
+    private var cinematicProxy: CinematicBackgroundView.Proxy
+
     @FocusState
     private var isSectionFocused
 
     @FocusedValue(\.focusedPoster)
     private var focusedPoster
-
-    @StateObject
-    private var viewModel: CinematicBackgroundView.Proxy = .init()
 
     private var topContent: (Item) -> any View
     private var itemContent: (Item) -> any View
@@ -52,28 +51,9 @@ struct CinematicItemSelector<Item: Poster>: View {
         }
         .frame(height: UIScreen.main.bounds.height - 75, alignment: .bottomLeading)
         .frame(maxWidth: .infinity)
-        .background(alignment: .top) {
-            CinematicBackgroundView(
-                viewModel: viewModel,
-                initialItem: items.first
-            )
-            .overlay {
-                Color.black
-                    .maskLinearGradient {
-                        (location: 0.5, opacity: 0)
-                        (location: 0.6, opacity: 0.4)
-                        (location: 1, opacity: 1)
-                    }
-            }
-            .frame(height: UIScreen.main.bounds.height)
-            .maskLinearGradient {
-                (location: 0.9, opacity: 1)
-                (location: 1, opacity: 0)
-            }
-        }
         .onChange(of: focusedPoster) {
             guard let focusedPoster, isSectionFocused else { return }
-            viewModel.select(item: focusedPoster)
+            cinematicProxy.select(item: focusedPoster)
         }
         .focusSection()
         .focused($isSectionFocused)

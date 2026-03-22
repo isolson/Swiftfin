@@ -19,35 +19,73 @@ struct HomeView: View {
     @StateObject
     private var viewModel = HomeViewModel()
 
+    @StateObject
+    private var cinematicProxy = CinematicBackgroundView.Proxy()
+
     @Default(.Customization.Home.showRecentlyAdded)
     private var showRecentlyAdded
 
+    private var initialBackgroundItem: (any Poster)? {
+        if viewModel.resumeItems.isNotEmpty {
+            return viewModel.resumeItems.elements.first
+        }
+        if showRecentlyAdded, viewModel.recentlyAddedViewModel.elements.isNotEmpty {
+            return viewModel.recentlyAddedViewModel.elements.first
+        }
+        if viewModel.nextUpViewModel.elements.isNotEmpty {
+            return viewModel.nextUpViewModel.elements.first
+        }
+        return nil
+    }
+
     @ViewBuilder
     private var contentView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-
-                if viewModel.resumeItems.isNotEmpty {
-                    CinematicResumeView(viewModel: viewModel)
-
-                    NextUpView(viewModel: viewModel.nextUpViewModel)
-
-                    if showRecentlyAdded {
-                        RecentlyAddedView(viewModel: viewModel.recentlyAddedViewModel)
+        ZStack {
+            CinematicBackgroundView(
+                viewModel: cinematicProxy,
+                initialItem: initialBackgroundItem
+            )
+            .overlay {
+                Color.black
+                    .maskLinearGradient {
+                        (location: 0.5, opacity: 0)
+                        (location: 0.6, opacity: 0.4)
+                        (location: 1, opacity: 1)
                     }
-                } else {
-                    if showRecentlyAdded {
-                        CinematicRecentlyAddedView(viewModel: viewModel.recentlyAddedViewModel)
+            }
+            .frame(height: UIScreen.main.bounds.height)
+            .maskLinearGradient {
+                (location: 0.9, opacity: 1)
+                (location: 1, opacity: 0)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+
+                    if viewModel.resumeItems.isNotEmpty {
+                        CinematicResumeView(viewModel: viewModel)
+
+                        NextUpView(viewModel: viewModel.nextUpViewModel)
+
+                        if showRecentlyAdded {
+                            RecentlyAddedView(viewModel: viewModel.recentlyAddedViewModel)
+                        }
+                    } else {
+                        if showRecentlyAdded {
+                            CinematicRecentlyAddedView(viewModel: viewModel.recentlyAddedViewModel)
+                        }
+
+                        NextUpView(viewModel: viewModel.nextUpViewModel)
+                            .safeAreaPadding(.top, 150)
                     }
 
-                    NextUpView(viewModel: viewModel.nextUpViewModel)
-                        .safeAreaPadding(.top, 150)
-                }
-
-                ForEach(viewModel.libraries) { viewModel in
-                    LatestInLibraryView(viewModel: viewModel)
+                    ForEach(viewModel.libraries) { viewModel in
+                        LatestInLibraryView(viewModel: viewModel)
+                    }
                 }
             }
+            .environmentObject(cinematicProxy)
         }
     }
 
@@ -76,6 +114,11 @@ struct HomeView: View {
             if interval > 60 || viewModel.notificationsReceived.contains(.itemMetadataDidChange) {
                 viewModel.send(.backgroundRefresh)
                 viewModel.notificationsReceived.remove(.itemMetadataDidChange)
+            }
+        }
+        .onChange(of: viewModel.state) {
+            if case .content = viewModel.state, let item = initialBackgroundItem {
+                cinematicProxy.select(item: item)
             }
         }
     }
