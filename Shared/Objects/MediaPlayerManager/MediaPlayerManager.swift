@@ -224,7 +224,7 @@ final class MediaPlayerManager: ViewModel {
             await self.stop()
             return
         }
-        let isNearEnd = (runtime - seconds) <= .seconds(1)
+        let isNearEnd = (runtime - seconds) <= .seconds(5)
 
         guard isNearEnd else {
             // If not near end, ignore.
