@@ -98,7 +98,7 @@ class NowPlayableObserver: ViewModel, MediaPlayerObserver {
 
     private func secondsDidChange(_ newSeconds: Duration) {
         handleNowPlayablePlaybackChange(
-            playing: true,
+            playing: manager?.playbackRequestStatus == .playing,
             metadata: .init(
                 position: newSeconds,
                 duration: manager?.item.runtime ?? .zero
@@ -151,6 +151,9 @@ class NowPlayableObserver: ViewModel, MediaPlayerObserver {
         for command in defaultRegisteredCommands {
             command.removeHandler()
         }
+
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
 
         Task(priority: .userInitiated) {
             // TODO: figure out way to not need delay
