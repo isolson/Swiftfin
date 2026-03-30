@@ -69,58 +69,60 @@ extension MediaPlayerItem {
 
         let maxBitrate = try await requestedBitrate.getMaxBitrate()
 
-        let deviceProfile = DeviceProfile.build(
-            for: videoPlayerType,
-            compatibilityMode: compatibilityMode,
-            maxBitrate: maxBitrate
-        )
+        let resolvedPlayerType: VideoPlayerType
+        let mediaSource: MediaSourceInfo
+        let playSessionID: String
 
-        var playbackInfo = PlaybackInfoDto()
-        playbackInfo.isAutoOpenLiveStream = true
-        playbackInfo.deviceProfile = deviceProfile
-        playbackInfo.liveStreamID = initialMediaSource.liveStreamID
-        playbackInfo.maxStreamingBitrate = maxBitrate
-        playbackInfo.userID = userSession.user.id
+        if videoPlayerType == .auto {
+            // Try native first — prefer native player when possible
+            let nativeResult = try await Self.queryPlaybackInfo(
+                itemID: itemID,
+                item: item,
+                initialMediaSource: initialMediaSource,
+                videoPlayerType: .native,
+                compatibilityMode: compatibilityMode,
+                maxBitrate: maxBitrate,
+                userSession: userSession,
+                logger: logger
+            )
 
-        if !item.isLiveStream {
-            playbackInfo.mediaSourceID = initialMediaSource.id
-        }
-
-        let request = Paths.getPostedPlaybackInfo(
-            itemID: itemID,
-            playbackInfo
-        )
-
-        let response = try await userSession.client.send(request)
-
-        let mediaSource: MediaSourceInfo? = {
-
-            guard let mediaSources = response.value.mediaSources else { return nil }
-
-            if let matchingTag = mediaSources.first(where: { $0.eTag == initialMediaSource.eTag }) {
-                return matchingTag
+            if nativeResult.mediaSource.transcodingURL == nil {
+                // Native can direct play
+                logger.trace("Auto player: using native player for item \(itemID)")
+                resolvedPlayerType = .native
+                mediaSource = nativeResult.mediaSource
+                playSessionID = nativeResult.playSessionID
+            } else {
+                // Native would transcode — fall back to VLC
+                logger.trace("Auto player: falling back to VLC for item \(itemID)")
+                let vlcResult = try await Self.queryPlaybackInfo(
+                    itemID: itemID,
+                    item: item,
+                    initialMediaSource: initialMediaSource,
+                    videoPlayerType: .swiftfin,
+                    compatibilityMode: compatibilityMode,
+                    maxBitrate: maxBitrate,
+                    userSession: userSession,
+                    logger: logger
+                )
+                resolvedPlayerType = .swiftfin
+                mediaSource = vlcResult.mediaSource
+                playSessionID = vlcResult.playSessionID
             }
-
-            for source in mediaSources {
-                if let openToken = source.openToken,
-                   let id = source.id,
-                   openToken.contains(id)
-                {
-                    return source
-                }
-            }
-
-            logger.warning("Unable to find matching media source, defaulting to first media source")
-
-            return mediaSources.first
-        }()
-
-        guard let mediaSource else {
-            throw ErrorMessage("Unable to find media source for item")
-        }
-
-        guard let playSessionID = response.value.playSessionID else {
-            throw ErrorMessage("No associated play session ID")
+        } else {
+            resolvedPlayerType = videoPlayerType
+            let result = try await Self.queryPlaybackInfo(
+                itemID: itemID,
+                item: item,
+                initialMediaSource: initialMediaSource,
+                videoPlayerType: videoPlayerType,
+                compatibilityMode: compatibilityMode,
+                maxBitrate: maxBitrate,
+                userSession: userSession,
+                logger: logger
+            )
+            mediaSource = result.mediaSource
+            playSessionID = result.playSessionID
         }
 
         let playbackURL = try Self.streamURL(
@@ -168,9 +170,77 @@ extension MediaPlayerItem {
             playSessionID: playSessionID,
             url: playbackURL,
             requestedBitrate: requestedBitrate,
+            resolvedVideoPlayerType: resolvedPlayerType,
             previewImageProvider: previewImageProvider,
             thumbnailProvider: item.getNowPlayingImage
         )
+    }
+
+    private static func queryPlaybackInfo(
+        itemID: String,
+        item: BaseItemDto,
+        initialMediaSource: MediaSourceInfo,
+        videoPlayerType: VideoPlayerType,
+        compatibilityMode: PlaybackCompatibility,
+        maxBitrate: Int?,
+        userSession: UserSession,
+        logger: Logger
+    ) async throws -> (mediaSource: MediaSourceInfo, playSessionID: String) {
+
+        let deviceProfile = DeviceProfile.build(
+            for: videoPlayerType,
+            compatibilityMode: compatibilityMode,
+            maxBitrate: maxBitrate
+        )
+
+        var playbackInfo = PlaybackInfoDto()
+        playbackInfo.isAutoOpenLiveStream = true
+        playbackInfo.deviceProfile = deviceProfile
+        playbackInfo.liveStreamID = initialMediaSource.liveStreamID
+        playbackInfo.maxStreamingBitrate = maxBitrate
+        playbackInfo.userID = userSession.user.id
+
+        if !item.isLiveStream {
+            playbackInfo.mediaSourceID = initialMediaSource.id
+        }
+
+        let request = Paths.getPostedPlaybackInfo(
+            itemID: itemID,
+            playbackInfo
+        )
+
+        let response = try await userSession.client.send(request)
+
+        let mediaSource: MediaSourceInfo? = {
+            guard let mediaSources = response.value.mediaSources else { return nil }
+
+            if let matchingTag = mediaSources.first(where: { $0.eTag == initialMediaSource.eTag }) {
+                return matchingTag
+            }
+
+            for source in mediaSources {
+                if let openToken = source.openToken,
+                   let id = source.id,
+                   openToken.contains(id)
+                {
+                    return source
+                }
+            }
+
+            logger.warning("Unable to find matching media source, defaulting to first media source")
+
+            return mediaSources.first
+        }()
+
+        guard let mediaSource else {
+            throw ErrorMessage("Unable to find media source for item")
+        }
+
+        guard let playSessionID = response.value.playSessionID else {
+            throw ErrorMessage("No associated play session ID")
+        }
+
+        return (mediaSource, playSessionID)
     }
 
     // TODO: audio type stream
