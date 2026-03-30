@@ -218,6 +218,9 @@ extension AVMediaPlayerProxy {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
+                if let duration = self?.player.currentItem?.duration, duration.isNumeric {
+                    self?.manager?.seconds = Duration.seconds(duration.seconds)
+                }
                 self?.manager?.ended()
             }
         }
