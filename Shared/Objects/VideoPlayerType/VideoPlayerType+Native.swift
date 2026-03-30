@@ -148,6 +148,7 @@ extension VideoPlayerType {
 
         SubtitleProfile.build(method: .embed) {
             SubtitleFormat.cc_dec
+            SubtitleFormat.mov_text
             SubtitleFormat.ttml
         }
 
@@ -159,6 +160,9 @@ extension VideoPlayerType {
         }
 
         SubtitleProfile.build(method: .hls) {
+            SubtitleFormat.ass
+            SubtitleFormat.ssa
+            SubtitleFormat.subrip
             SubtitleFormat.vtt
         }
     }

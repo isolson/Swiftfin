@@ -40,7 +40,7 @@ struct NativeVideoPlayer: View {
 
             switch manager.state {
             case .playback:
-                NativeVideoPlayerView(proxy: proxy)
+                NativeVideoPlayerView(proxy: proxy, item: manager.playbackItem?.baseItem)
             default:
                 ProgressView()
             }
@@ -81,17 +81,23 @@ extension NativeVideoPlayer {
     private struct NativeVideoPlayerView: UIViewControllerRepresentable {
 
         let proxy: AVMediaPlayerProxy
+        let item: BaseItemDto?
 
         func makeUIViewController(context: Context) -> UINativeVideoPlayerViewController {
             UINativeVideoPlayerViewController(proxy: proxy)
         }
 
-        func updateUIViewController(_ uiViewController: UINativeVideoPlayerViewController, context: Context) {}
+        func updateUIViewController(_ uiViewController: UINativeVideoPlayerViewController, context: Context) {
+            #if os(tvOS)
+            uiViewController.updateInfoPanel(for: item)
+            #endif
+        }
     }
 
     private class UINativeVideoPlayerViewController: AVPlayerViewController {
 
         private let proxy: AVMediaPlayerProxy
+        private var currentItemID: String?
 
         init(proxy: AVMediaPlayerProxy) {
             self.proxy = proxy
@@ -101,7 +107,11 @@ extension NativeVideoPlayer {
             player = proxy.player
 
             player?.allowsExternalPlayback = true
+            #if os(tvOS)
+            player?.appliesMediaSelectionCriteriaAutomatically = true
+            #else
             player?.appliesMediaSelectionCriteriaAutomatically = false
+            #endif
             player?.usesExternalPlaybackWhileExternalScreenIsActive = true
             allowsPictureInPicturePlayback = true
 
@@ -109,6 +119,17 @@ extension NativeVideoPlayer {
             updatesNowPlayingInfoCenter = false
             #endif
         }
+
+        #if os(tvOS)
+        func updateInfoPanel(for item: BaseItemDto?) {
+            guard let item, item.id != currentItemID else { return }
+            currentItemID = item.id
+
+            let infoVC = UIHostingController(rootView: NativePlayerInfoView(item: item))
+            infoVC.title = L10n.info
+            customInfoViewControllers = [infoVC]
+        }
+        #endif
 
         override func viewDidDisappear(_ animated: Bool) {
             super.viewDidDisappear(animated)
@@ -122,3 +143,43 @@ extension NativeVideoPlayer {
         }
     }
 }
+
+// MARK: - Info Panel
+
+#if os(tvOS)
+private struct NativePlayerInfoView: View {
+
+    let item: BaseItemDto
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(item.displayTitle)
+                .font(.title2)
+                .fontWeight(.bold)
+
+            DotHStack {
+                if item.type == .episode, let seasonEpisodeLocator = item.seasonEpisodeLabel {
+                    Text(seasonEpisodeLocator)
+                }
+
+                if let runtime = item.runTimeLabel {
+                    Text(runtime)
+                }
+
+                if let officialRating = item.officialRating {
+                    Text(officialRating)
+                }
+            }
+            .foregroundStyle(.secondary)
+
+            if let overview = item.overview {
+                Text(overview)
+                    .font(.body)
+                    .lineLimit(6)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(40)
+    }
+}
+#endif
