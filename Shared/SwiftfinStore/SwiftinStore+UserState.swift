@@ -122,6 +122,10 @@ extension UserState {
 
         let keychain = Container.shared.keychainService()
         keychain.delete("\(id)-pin")
+
+        #if os(tvOS)
+        Container.shared.cloudCredentialSync().removeUser(id)
+        #endif
     }
 
     /// Deletes user settings from `UserDefaults` and `StoredValues`

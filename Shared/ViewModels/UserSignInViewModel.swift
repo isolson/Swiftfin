@@ -235,6 +235,12 @@ final class UserSignInViewModel: ViewModel {
         }
 
         events.send(.saved(savedUserState))
+
+        #if os(tvOS)
+        let sync = Container.shared.cloudCredentialSync()
+        sync.pushServers()
+        sync.pushUser(savedUserState)
+        #endif
     }
 
     @Function(\Action.Cases.saveExisting)
@@ -262,6 +268,10 @@ final class UserSignInViewModel: ViewModel {
 
         if replaceForAccessToken {
             user.state.state.accessToken = user.state.accessToken
+
+            #if os(tvOS)
+            Container.shared.cloudCredentialSync().pushUser(user.state.state)
+            #endif
         }
 
         events.send(.saved(user.state.state))

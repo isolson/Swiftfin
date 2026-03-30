@@ -33,6 +33,21 @@ final class SelectUserViewModel: ViewModel {
     @Published
     private(set) var servers: OrderedDictionary<ServerState, [UserState]> = [:]
 
+    override init() {
+        super.init()
+
+        #if os(tvOS)
+        Notifications[.didSyncCloudCredentials]
+            .publisher
+            .sink { [weak self] _ in
+                Task { [weak self] in
+                    try? await self?._getServers()
+                }
+            }
+            .store(in: &cancellables)
+        #endif
+    }
+
     @Function(\Action.Cases.deleteUsers)
     private func _deleteUsers(_ users: Set<UserState>) async throws {
         for user in users {

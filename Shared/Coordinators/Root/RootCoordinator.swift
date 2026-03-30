@@ -24,6 +24,16 @@ final class RootCoordinator: ObservableObject {
             do {
                 try await SwiftfinStore.setupDataStack()
 
+                #if os(tvOS)
+                if Defaults[.iCloudSync] {
+                    let sync = Container.shared.cloudCredentialSync()
+                    // Per Apple docs: register observer before synchronize
+                    sync.startObserving()
+                    sync.synchronizeOnLaunch()
+                    sync.importRemoteData(changedKeys: nil)
+                }
+                #endif
+
                 if Container.shared.currentUserSession() != nil, !Defaults[.signOutOnClose] {
                     #if os(tvOS)
                     await MainActor.run {

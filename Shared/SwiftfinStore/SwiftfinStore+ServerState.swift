@@ -53,6 +53,10 @@ extension ServerState {
     /// Deletes the model that this state represents and
     /// all settings from `StoredValues`.
     func delete() throws {
+        #if os(tvOS)
+        Container.shared.cloudCredentialSync().removeServer(id, userIDs: userIDs)
+        #endif
+
         try SwiftfinStore.dataStack.perform { transaction in
             guard let storedServer = try transaction.fetchOne(From<ServerModel>().where(\.$id == id)) else {
                 throw ErrorMessage("Unable to find server to delete")
