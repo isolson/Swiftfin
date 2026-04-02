@@ -234,7 +234,6 @@ extension Defaults.Keys {
 
         // TODO: transition into a SubtitleConfiguration instead of multiple types
         enum Subtitle {
-
             static let subtitleColor: Key<Color> = UserKey("subtitleColor", default: .white)
             static let subtitleFontName: Key<String> = UserKey("subtitleFontName", default: UIFont.systemFont(ofSize: 14).fontName)
             static let subtitleSize: Key<Int> = UserKey("subtitleSize", default: 9)
