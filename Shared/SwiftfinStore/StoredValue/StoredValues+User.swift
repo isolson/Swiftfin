@@ -173,6 +173,14 @@ extension StoredValues.Keys {
             )
         }
 
+        static var subtitlePreference: Key<SubtitlePreference?> {
+            CurrentUserKey(
+                "subtitlePreference",
+                domain: "setting-subtitlePreference",
+                default: nil
+            )
+        }
+
         static var enabledTrailers: Key<TrailerSelection> {
             CurrentUserKey(
                 "enabledTrailers",

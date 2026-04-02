@@ -34,6 +34,8 @@ class MediaPlayerItem: ViewModel, MediaPlayerObserver {
             if let proxy = manager?.proxy as? any VideoMediaPlayerProxy {
                 proxy.setSubtitleStream(.init(index: selectedSubtitleStreamIndex))
             }
+
+            persistSubtitlePreference()
         }
     }
 
@@ -95,8 +97,44 @@ class MediaPlayerItem: ViewModel, MediaPlayerObserver {
         super.init()
 
         selectedAudioStreamIndex = mediaSource.defaultAudioStreamIndex ?? -1
-        selectedSubtitleStreamIndex = mediaSource.defaultSubtitleStreamIndex ?? -1
+        selectedSubtitleStreamIndex = Self.resolveSubtitleStreamIndex(
+            subtitleStreams: subtitleStreams,
+            serverDefault: mediaSource.defaultSubtitleStreamIndex
+        )
 
         observers.append(MediaProgressObserver(item: self))
+    }
+
+    // MARK: - Subtitle Preference
+
+    private static func resolveSubtitleStreamIndex(
+        subtitleStreams: [MediaStream],
+        serverDefault: Int?
+    ) -> Int? {
+        // 1. Current-user preference
+        if let preference = StoredValues[.User.subtitlePreference],
+           let index = preference.matchingStreamIndex(in: subtitleStreams)
+        {
+            return index
+        }
+
+        // 2. Server default
+        return serverDefault ?? -1
+    }
+
+    private func persistSubtitlePreference() {
+        let preference: SubtitlePreference
+
+        if selectedSubtitleStreamIndex == nil || selectedSubtitleStreamIndex == -1 {
+            preference = .none
+        } else if let stream = subtitleStreams.first(where: { $0.index == selectedSubtitleStreamIndex }),
+                  let language = stream.language
+        {
+            preference = .language(code: language, forcedOnly: stream.isForced ?? false)
+        } else {
+            return
+        }
+
+        StoredValues[.User.subtitlePreference] = preference
     }
 }
