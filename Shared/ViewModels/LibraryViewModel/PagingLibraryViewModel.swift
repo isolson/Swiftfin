@@ -144,6 +144,17 @@ class PagingLibraryViewModel<Element: Poster>: ViewModel, Eventful, Stateful {
                 self.elements.remove(id: id.hashValue)
             }
             .store(in: &cancellables)
+
+        Notifications[.itemShouldRefreshMetadata]
+            .publisher
+            .sink { [weak self] id in
+                guard let self, self.elements[id: id.hashValue] != nil else { return }
+
+                Task { @MainActor in
+                    self.send(.refresh)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     convenience init(
@@ -196,6 +207,17 @@ class PagingLibraryViewModel<Element: Poster>: ViewModel, Eventful, Stateful {
             .publisher
             .sink { id in
                 self.elements.remove(id: id.hashValue)
+            }
+            .store(in: &cancellables)
+
+        Notifications[.itemShouldRefreshMetadata]
+            .publisher
+            .sink { [weak self] id in
+                guard let self, self.elements[id: id.hashValue] != nil else { return }
+
+                Task { @MainActor in
+                    self.send(.refresh)
+                }
             }
             .store(in: &cancellables)
 

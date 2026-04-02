@@ -256,6 +256,7 @@ class ItemViewModel: ViewModel, Stateful {
                 let beforeIsFavorite = item.userData?.isFavorite ?? false
 
                 await MainActor.run {
+                    objectWillChange.send()
                     item.userData?.isFavorite?.toggle()
                 }
 
@@ -280,6 +281,7 @@ class ItemViewModel: ViewModel, Stateful {
                 let beforeIsPlayed = item.userData?.isPlayed ?? false
 
                 await MainActor.run {
+                    objectWillChange.send()
                     item.userData?.isPlayed?.toggle()
                 }
 

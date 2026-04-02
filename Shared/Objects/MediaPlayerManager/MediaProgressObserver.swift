@@ -142,6 +142,7 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
 
             let request = Paths.reportPlaybackStopped(info)
             let _ = try await userSession.client.send(request)
+            postItemRefreshNotifications(for: item.baseItem)
         }
     }
 
@@ -164,6 +165,16 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
 
             let request = Paths.reportPlaybackProgress(info)
             let _ = try await userSession.client.send(request)
+        }
+    }
+
+    private func postItemRefreshNotifications(for item: BaseItemDto) {
+        guard let itemID = item.id else { return }
+
+        Notifications[.itemShouldRefreshMetadata].post(itemID)
+
+        if let seriesID = item.seriesID, seriesID != itemID {
+            Notifications[.itemShouldRefreshMetadata].post(seriesID)
         }
     }
 }

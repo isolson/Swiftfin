@@ -74,6 +74,23 @@ final class HomeViewModel: ViewModel, Stateful {
                 }
             }
             .store(in: &cancellables)
+
+        Notifications[.itemShouldRefreshMetadata]
+            .publisher
+            .sink { [weak self] itemID in
+                guard let self else { return }
+
+                let shouldRefresh = self.resumeItems.contains {
+                    $0.id == itemID
+                }
+
+                guard shouldRefresh else { return }
+
+                Task { @MainActor in
+                    self.send(.backgroundRefresh)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func respond(to action: Action) -> State {
