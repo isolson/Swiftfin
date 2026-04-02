@@ -19,6 +19,9 @@ import SwiftUI
 @MainActor
 class AVMediaPlayerProxy: VideoMediaPlayerProxy {
 
+    @Published
+    var shouldPresentPostPlayActions: Bool = false
+
     let isBuffering: PublishedBox<Bool> = .init(initialValue: false)
     var isScrubbing: Binding<Bool> = .constant(false)
     var scrubbedSeconds: Binding<Duration> = .constant(.zero)
@@ -124,15 +127,19 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
 
         Task {
             guard let group = try? await currentItem.asset.loadMediaSelectionGroup(for: .audible) else { return }
+            let playbackStreams = manager?.playbackItem?.audioStreams ?? []
+            let selectedStream = playbackStreams.first(where: { $0.index == stream.index }) ?? stream
             let options = group.options
 
-            if let languageCode = stream.language,
+            if let languageCode = selectedStream.language,
                let match = options
                    .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
             {
                 currentItem.select(match, in: group)
-            } else if let index = stream.index, index >= 0, index < options.count {
-                currentItem.select(options[index], in: group)
+            } else if let optionIndex = playbackStreams.firstIndex(where: { $0.index == selectedStream.index }),
+                      optionIndex < options.count
+            {
+                currentItem.select(options[optionIndex], in: group)
             }
         }
     }
@@ -149,15 +156,19 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
                 return
             }
 
+            let playbackStreams = manager?.playbackItem?.subtitleStreams ?? []
+            let selectedStream = playbackStreams.first(where: { $0.index == index }) ?? stream
             let options = group.options
 
-            if let languageCode = stream.language,
+            if let languageCode = selectedStream.language,
                let match = options
                    .first(where: { $0.extendedLanguageTag == languageCode || $0.locale?.language.languageCode?.identifier == languageCode })
             {
                 currentItem.select(match, in: group)
-            } else if index < options.count {
-                currentItem.select(options[index], in: group)
+            } else if let optionIndex = playbackStreams.firstIndex(where: { $0.index == selectedStream.index }),
+                      optionIndex < options.count
+            {
+                currentItem.select(options[optionIndex], in: group)
             }
         }
     }
@@ -175,7 +186,9 @@ class AVMediaPlayerProxy: VideoMediaPlayerProxy {
 extension AVMediaPlayerProxy {
 
     private func playbackStopped() {
+        shouldPresentPostPlayActions = false
         player.pause()
+        player.replaceCurrentItem(with: nil)
 
         if let timeObserver {
             DispatchQueue.main.async {
@@ -201,6 +214,7 @@ extension AVMediaPlayerProxy {
     }
 
     private func playNew(item: MediaPlayerItem) {
+        shouldPresentPostPlayActions = false
         let baseItem = item.baseItem
 
         if let endOfPlaybackObserver {
@@ -218,10 +232,22 @@ extension AVMediaPlayerProxy {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                if let duration = self?.player.currentItem?.duration, duration.isNumeric {
-                    self?.manager?.seconds = Duration.seconds(duration.seconds)
+                guard let self else { return }
+
+                if let duration = self.player.currentItem?.duration, duration.isNumeric {
+                    self.manager?.seconds = Duration.seconds(duration.seconds)
                 }
-                self?.manager?.ended()
+
+                if let nextItem = self.manager?.queue?.nextItem,
+                   Defaults[.VideoPlayer.autoPlayEnabled]
+                {
+                    self.manager?.playNewItem(provider: nextItem)
+                } else if self.manager?.item.type == .episode {
+                    self.shouldPresentPostPlayActions = true
+                    self.manager?.setPlaybackRequestStatus(status: .paused)
+                } else {
+                    self.manager?.ended()
+                }
             }
         }
 
