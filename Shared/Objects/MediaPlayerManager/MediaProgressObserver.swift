@@ -29,6 +29,7 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
     private var hasSentStart = false
     private var item: MediaPlayerItem?
     private var lastPlaybackRequestStatus: MediaPlayerManager.PlaybackRequestStatus = .playing
+    private var lastSeconds: Duration = .zero
 
     init(item: MediaPlayerItem) {
         self.item = item
@@ -38,15 +39,18 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
     private func sendReport() {
         guard let item else { return }
 
+        let currentSeconds = manager?.seconds
+        lastSeconds = currentSeconds ?? lastSeconds
+
         switch lastPlaybackRequestStatus {
         case .playing:
             if hasSentStart {
-                sendProgressReport(for: item, seconds: manager?.seconds)
+                sendProgressReport(for: item, seconds: currentSeconds)
             } else {
-                sendStartReport(for: item, seconds: manager?.seconds)
+                sendStartReport(for: item, seconds: currentSeconds)
             }
         case .paused:
-            sendProgressReport(for: item, seconds: manager?.seconds, isPaused: true)
+            sendProgressReport(for: item, seconds: currentSeconds, isPaused: true)
         }
     }
 
@@ -76,7 +80,7 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
         timer.poke()
 
         if let item, newItem !== item {
-            sendStopReport(for: item, seconds: manager?.seconds)
+            sendStopReport(for: item, seconds: lastSeconds)
 
             self.item = newItem
             self.hasSentStart = false
@@ -95,7 +99,7 @@ class MediaProgressObserver: ViewModel, MediaPlayerObserver {
         switch action {
         case .stop:
             if let item {
-                sendStopReport(for: item, seconds: manager?.seconds)
+                sendStopReport(for: item, seconds: manager?.seconds ?? lastSeconds)
             }
             timer.stop()
             cancellables = []
