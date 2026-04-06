@@ -64,6 +64,8 @@ extension ServerState {
             transaction.delete(storedData)
             transaction.delete(storedServer)
         }
+
+        SwiftfinStore.syncPersistenceBackup()
     }
 
     func getPublicSystemInfo() async throws -> PublicSystemInfo {
@@ -95,6 +97,7 @@ extension ServerState {
         }
 
         StoredValues[.Server.publicInfo(id: server.id)] = publicInfo
+        SwiftfinStore.syncPersistenceBackup()
     }
 
     var isVersionCompatible: Bool {

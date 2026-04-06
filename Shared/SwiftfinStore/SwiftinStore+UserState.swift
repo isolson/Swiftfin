@@ -122,6 +122,8 @@ extension UserState {
 
         let keychain = Container.shared.keychainService()
         keychain.delete("\(id)-pin")
+
+        SwiftfinStore.syncPersistenceBackup()
     }
 
     /// Deletes user settings from `UserDefaults` and `StoredValues`

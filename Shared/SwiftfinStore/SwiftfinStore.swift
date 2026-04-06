@@ -71,6 +71,9 @@ extension SwiftfinStore {
             _ = dataStack.addStorage(storage) { result in
                 switch result {
                 case .success:
+                    if restorePersistenceBackupIfNeeded() {
+                        syncPersistenceBackup()
+                    }
                     continuation.resume()
                 case let .failure(error):
                     logger.error("Failed creating datastack with: \(error.localizedDescription)")

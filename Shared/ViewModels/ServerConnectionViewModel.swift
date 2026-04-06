@@ -51,6 +51,7 @@ final class ServerConnectionViewModel: ViewModel {
                 UserDefaults.userSuite(id: user.id).removeAll()
             }
 
+            SwiftfinStore.syncPersistenceBackup()
             Notifications[.didDeleteServer].post(server)
         } catch {
             logger.critical("Unable to delete server: \(server.name)")
@@ -71,6 +72,7 @@ final class ServerConnectionViewModel: ViewModel {
             Notifications[.didChangeCurrentServerURL].post(newState)
 
             self.server = newState
+            SwiftfinStore.syncPersistenceBackup()
         } catch {
             logger.critical("\(error.localizedDescription)")
         }

@@ -64,7 +64,6 @@ private extension Defaults.Keys {
 // MARK: App
 
 extension Defaults.Keys {
-
     /// The _real_ accent color key to be used.
     ///
     /// This is set externally whenever the app or user accent colors change,
@@ -89,6 +88,10 @@ extension Defaults.Keys {
     static let selectUserServerSelection: Key<SelectUserServerSelection> = AppKey("selectUserServerSelection", default: .all)
     static let selectUserAllServersSplashscreen: Key<SelectUserServerSelection> = AppKey("selectUserAllServersSplashscreen", default: .all)
     static let selectUserUseSplashscreen: Key<Bool> = AppKey("selectUserUseSplashscreen", default: true)
+    static let persistenceBackupServers: Key<[SwiftfinStore.PersistenceBackupServer]> = AppKey(
+        "persistenceBackupServers",
+        default: []
+    )
 
     static let signOutOnBackground: Key<Bool> = AppKey("signOutOnBackground", default: true)
     static let signOutOnClose: Key<Bool> = AppKey("signOutOnClose", default: false)
