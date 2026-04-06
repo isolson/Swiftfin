@@ -234,6 +234,7 @@ final class UserSignInViewModel: ViewModel {
             savedUserState.pin = evaluatedPinPolicy.pin
         }
 
+        SwiftfinStore.syncPersistenceBackup()
         events.send(.saved(savedUserState))
     }
 

@@ -77,5 +77,6 @@ final class UserLocalSecurityViewModel: ViewModel, Eventful {
 
         userSession.user.accessPolicy = newPolicy
         userSession.user.pinHint = newPinHint
+        SwiftfinStore.syncPersistenceBackup()
     }
 }

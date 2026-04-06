@@ -157,6 +157,7 @@ final class ConnectToServerViewModel: ViewModel {
         }
 
         StoredValues[.Server.publicInfo(id: server.id)] = publicInfo
+        SwiftfinStore.syncPersistenceBackup()
     }
 
     // server has same id, but (possible) new URL
@@ -175,6 +176,7 @@ final class ConnectToServerViewModel: ViewModel {
             return editServer.state
         }
 
+        SwiftfinStore.syncPersistenceBackup()
         Notifications[.didChangeCurrentServerURL].post(newState)
     }
 
