@@ -7,6 +7,7 @@
 //
 
 import Combine
+import Defaults
 import Foundation
 import JellyfinAPI
 import OrderedCollections
@@ -41,12 +42,19 @@ final class SearchViewModel: ViewModel {
         case searching
     }
 
+    private static let recentSearchesLimit = 10
+    private static let resultLimitPerType = 20
+    private static let hintsLimit = 8
+
     @Published
     private(set) var items: [BaseItemKind: [BaseItemDto]] = [:]
     @Published
     private(set) var suggestions: [BaseItemDto] = []
+    @Published
+    private(set) var hints: [SearchHint] = []
 
     private var searchQuery: CurrentValueSubject<String, Never> = .init("")
+    private var hintsTask: Task<Void, Never>?
 
     let filterViewModel: FilterViewModel
 
@@ -55,7 +63,7 @@ final class SearchViewModel: ViewModel {
     }
 
     var canSearch: Bool {
-        searchQuery.value.isNotEmpty || filterViewModel.currentFilters.hasQueryableFilters
+        normalize(searchQuery.value).isNotEmpty || filterViewModel.currentFilters.hasQueryableFilters
     }
 
     // MARK: init
@@ -73,6 +81,17 @@ final class SearchViewModel: ViewModel {
             }
             .store(in: &cancellables)
 
+        // Lower-latency pipeline that powers `.searchSuggestions`.
+        searchQuery
+            .debounce(for: 0.2, scheduler: RunLoop.main)
+            .removeDuplicates()
+            .sink { [weak self] query in
+                guard let self else { return }
+
+                fetchHints(for: query)
+            }
+            .store(in: &cancellables)
+
         filterViewModel.$currentFilters
             .debounce(for: 0.5, scheduler: RunLoop.main)
             .sink { [weak self] _ in
@@ -83,15 +102,43 @@ final class SearchViewModel: ViewModel {
             .store(in: &cancellables)
     }
 
+    // MARK: query normalization
+
+    private func normalize(_ query: String) -> String {
+        query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    /// Variants of a query to send to the server in parallel and merge.
+    /// The space-collapsed variant catches titles that the server tokenizes
+    /// as a single word but the user typed with spaces (e.g., "hammer barn"
+    /// → "hammerbarn").
+    private func variants(for normalizedQuery: String) -> [String] {
+        guard normalizedQuery.contains(" ") else { return [normalizedQuery] }
+        let collapsed = normalizedQuery.replacingOccurrences(of: " ", with: "")
+        return [normalizedQuery, collapsed]
+    }
+
+    // MARK: search
+
     @Function(\Action.Cases.search)
     private func _search(_ query: String) async throws {
         searchQuery.value = query
+
+        if normalize(query).isEmpty {
+            hints = []
+            hintsTask?.cancel()
+        }
 
         await cancel()
     }
 
     @Function(\Action.Cases.actuallySearch)
     private func _actuallySearch(_ query: String) async throws {
+
+        let normalizedQuery = normalize(query)
+        let queryVariants = variants(for: normalizedQuery)
 
         guard self.canSearch else {
             items.removeAll()
@@ -118,14 +165,14 @@ final class SearchViewModel: ViewModel {
 
             for type in retrievingItemTypes {
                 group.addTask {
-                    let items = try await self._getItems(query: query, itemType: type)
+                    let items = try await self._getItems(variants: queryVariants, itemType: type)
                     return (type, items)
                 }
             }
 
             // People
             group.addTask {
-                let items = try await self._getPeople(query: query)
+                let items = try await self._getPeople(variants: queryVariants)
                 return (BaseItemKind.person, items)
             }
 
@@ -144,6 +191,36 @@ final class SearchViewModel: ViewModel {
         self.items = newItems
     }
 
+    /// Run all variants concurrently and merge — preserving the original
+    /// query's relevance ordering by appending novel ids from later variants.
+    private func _getItems(variants: [String], itemType: BaseItemKind) async throws -> [BaseItemDto] {
+
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [BaseItemDto]).self,
+            returning: [[BaseItemDto]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let items = try await self._getItems(query: variant, itemType: itemType)
+                    return (index, items)
+                }
+            }
+
+            var indexed: [(Int, [BaseItemDto])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<BaseItemDto> = []
+        for batch in perVariant {
+            for item in batch { merged.append(item) }
+        }
+
+        return Array(merged.prefix(Self.resultLimitPerType))
+    }
+
     private func _getItems(query: String, itemType: BaseItemKind) async throws -> [BaseItemDto] {
 
         var parameters = Paths.GetItemsByUserIDParameters()
@@ -151,8 +228,8 @@ final class SearchViewModel: ViewModel {
         parameters.fields = .MinimumFields
         parameters.includeItemTypes = [itemType]
         parameters.isRecursive = true
-        parameters.limit = 20
-        parameters.searchTerm = query
+        parameters.limit = Self.resultLimitPerType
+        parameters.searchTerm = query.isEmpty ? nil : query
 
         // Filters
         let filters = filterViewModel.currentFilters
@@ -178,16 +255,135 @@ final class SearchViewModel: ViewModel {
         return response.value.items ?? []
     }
 
+    private func _getPeople(variants: [String]) async throws -> [BaseItemDto] {
+
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [BaseItemDto]).self,
+            returning: [[BaseItemDto]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let items = try await self._getPeople(query: variant)
+                    return (index, items)
+                }
+            }
+
+            var indexed: [(Int, [BaseItemDto])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<BaseItemDto> = []
+        for batch in perVariant {
+            for item in batch { merged.append(item) }
+        }
+
+        return Array(merged.prefix(Self.resultLimitPerType))
+    }
+
     private func _getPeople(query: String) async throws -> [BaseItemDto] {
 
+        guard query.isNotEmpty else { return [] }
+
         var parameters = Paths.GetPersonsParameters()
-        parameters.limit = 20
+        parameters.limit = Self.resultLimitPerType
         parameters.searchTerm = query
 
         let request = Paths.getPersons(parameters: parameters)
         let response = try await userSession.client.send(request)
 
         return response.value.items ?? []
+    }
+
+    // MARK: hints
+
+    private func fetchHints(for query: String) {
+        hintsTask?.cancel()
+
+        let normalizedQuery = normalize(query)
+        guard normalizedQuery.isNotEmpty else {
+            hints = []
+            return
+        }
+
+        hintsTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let merged = try await self.fetchMergedHints(variants: self.variants(for: normalizedQuery))
+                guard !Task.isCancelled else { return }
+                self.hints = merged
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.hints = []
+            }
+        }
+    }
+
+    private func fetchMergedHints(variants: [String]) async throws -> [SearchHint] {
+
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [SearchHint]).self,
+            returning: [[SearchHint]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let hints = try await self.fetchHints(query: variant)
+                    return (index, hints)
+                }
+            }
+
+            var indexed: [(Int, [SearchHint])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<SearchHint> = []
+        for batch in perVariant {
+            for hint in batch { merged.append(hint) }
+        }
+
+        return Array(merged.prefix(Self.hintsLimit))
+    }
+
+    private func fetchHints(query: String) async throws -> [SearchHint] {
+
+        var parameters = Paths.GetSearchHintsParameters(searchTerm: query)
+        parameters.userID = userSession.user.id
+        parameters.limit = Self.hintsLimit
+        parameters.isIncludeMedia = true
+        parameters.isIncludePeople = true
+        parameters.isIncludeArtists = true
+
+        let request = Paths.getSearchHints(parameters: parameters)
+        let response = try await userSession.client.send(request)
+
+        return response.value.searchHints ?? []
+    }
+
+    // MARK: recent searches
+
+    func recordRecentSearch(_ query: String) {
+        let trimmed = normalize(query)
+        guard trimmed.isNotEmpty else { return }
+
+        var current = Defaults[.recentSearches]
+        current.removeAll { $0.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }
+        current.insert(trimmed, at: 0)
+        if current.count > Self.recentSearchesLimit {
+            current = Array(current.prefix(Self.recentSearchesLimit))
+        }
+        Defaults[.recentSearches] = current
+    }
+
+    func clearRecentSearches() {
+        Defaults[.recentSearches] = []
     }
 
     // MARK: suggestions

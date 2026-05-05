@@ -110,6 +110,10 @@ extension Defaults.Keys {
         UserKey("userAppearance", default: .system)
     }
 
+    static var recentSearches: Key<[String]> {
+        UserKey("recentSearches", default: [])
+    }
+
     enum Customization {
 
         static let itemViewType: Key<ItemViewType> = UserKey("itemViewType", default: .compactLogo)
