@@ -15,6 +15,9 @@ struct SearchView: View {
     @Default(.Customization.searchPosterType)
     private var searchPosterType
 
+    @Default(.recentSearches)
+    private var recentSearches
+
     @Router
     private var router
 
@@ -193,5 +196,39 @@ struct SearchView: View {
             viewModel.search(query: newValue)
         }
         .searchable(text: $searchQuery, prompt: L10n.search)
+        .searchSuggestions {
+            if searchQuery.isEmpty {
+                ForEach(recentSearches, id: \.self) { recent in
+                    Label(recent, systemImage: "clock.arrow.circlepath")
+                        .searchCompletion(recent)
+                }
+                if recentSearches.isNotEmpty {
+                    Button(role: .destructive) {
+                        viewModel.clearRecentSearches()
+                    } label: {
+                        Label(L10n.removeAll, systemImage: "trash")
+                    }
+                }
+            } else {
+                ForEach(viewModel.hints, id: \.hashValue) { hint in
+                    Button {
+                        select(hint.asBaseItemDto)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text(hint.name ?? L10n.unknown)
+                                if let series = hint.series {
+                                    Text(series)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        } icon: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
