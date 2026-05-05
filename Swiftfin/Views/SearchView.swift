@@ -149,6 +149,7 @@ struct SearchView: View {
     }
 
     private func select(_ item: BaseItemDto, in namespace: Namespace.ID) {
+        viewModel.recordRecentSearch(searchQuery)
         switch item.type {
         case .program, .tvChannel:
             let provider = item.getPlaybackItemProvider(userSession: viewModel.userSession)
@@ -244,8 +245,9 @@ struct SearchView: View {
                     }
                 }
             } else {
-                ForEach(viewModel.hints, id: \.hashValue) { hint in
+                ForEach(viewModel.hints, id: \.compositeID) { hint in
                     Button {
+                        viewModel.recordRecentSearch(searchQuery)
                         router.route(to: .item(item: hint.asBaseItemDto))
                     } label: {
                         Label {

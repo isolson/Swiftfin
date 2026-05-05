@@ -139,6 +139,7 @@ struct SearchView: View {
     }
 
     private func select(_ item: BaseItemDto) {
+        viewModel.recordRecentSearch(searchQuery)
         switch item.type {
         case .program, .tvChannel:
             let provider = item.getPlaybackItemProvider(userSession: viewModel.userSession)
@@ -210,7 +211,7 @@ struct SearchView: View {
                     }
                 }
             } else {
-                ForEach(viewModel.hints, id: \.hashValue) { hint in
+                ForEach(viewModel.hints, id: \.compositeID) { hint in
                     Button {
                         select(hint.asBaseItemDto)
                     } label: {

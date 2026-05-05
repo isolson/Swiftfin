@@ -189,23 +189,33 @@ final class SearchViewModel: ViewModel {
 
         guard !Task.isCancelled else { return }
         self.items = newItems
-
-        if normalizedQuery.isNotEmpty, newItems.values.contains(where: \.isNotEmpty) {
-            recordRecentSearch(normalizedQuery)
-        }
     }
 
+    /// Run all variants concurrently and merge — preserving the original
+    /// query's relevance ordering by appending novel ids from later variants.
     private func _getItems(variants: [String], itemType: BaseItemKind) async throws -> [BaseItemDto] {
 
-        var merged: OrderedSet<BaseItemDto> = []
-
-        for variant in variants {
-            let items = try await _getItems(query: variant, itemType: itemType)
-            for item in items {
-                merged.append(item)
-                if merged.count >= Self.resultLimitPerType { break }
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [BaseItemDto]).self,
+            returning: [[BaseItemDto]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let items = try await self._getItems(query: variant, itemType: itemType)
+                    return (index, items)
+                }
             }
-            if merged.count >= Self.resultLimitPerType { break }
+
+            var indexed: [(Int, [BaseItemDto])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<BaseItemDto> = []
+        for batch in perVariant {
+            for item in batch { merged.append(item) }
         }
 
         return Array(merged.prefix(Self.resultLimitPerType))
@@ -247,15 +257,27 @@ final class SearchViewModel: ViewModel {
 
     private func _getPeople(variants: [String]) async throws -> [BaseItemDto] {
 
-        var merged: OrderedSet<BaseItemDto> = []
-
-        for variant in variants {
-            let items = try await _getPeople(query: variant)
-            for item in items {
-                merged.append(item)
-                if merged.count >= Self.resultLimitPerType { break }
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [BaseItemDto]).self,
+            returning: [[BaseItemDto]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let items = try await self._getPeople(query: variant)
+                    return (index, items)
+                }
             }
-            if merged.count >= Self.resultLimitPerType { break }
+
+            var indexed: [(Int, [BaseItemDto])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<BaseItemDto> = []
+        for batch in perVariant {
+            for item in batch { merged.append(item) }
         }
 
         return Array(merged.prefix(Self.resultLimitPerType))
@@ -304,15 +326,27 @@ final class SearchViewModel: ViewModel {
 
     private func fetchMergedHints(variants: [String]) async throws -> [SearchHint] {
 
-        var merged: OrderedSet<SearchHint> = []
-
-        for variant in variants {
-            let hints = try await fetchHints(query: variant)
-            for hint in hints {
-                merged.append(hint)
-                if merged.count >= Self.hintsLimit { break }
+        let perVariant = try await withThrowingTaskGroup(
+            of: (Int, [SearchHint]).self,
+            returning: [[SearchHint]].self
+        ) { group in
+            for (index, variant) in variants.enumerated() {
+                group.addTask {
+                    let hints = try await self.fetchHints(query: variant)
+                    return (index, hints)
+                }
             }
-            if merged.count >= Self.hintsLimit { break }
+
+            var indexed: [(Int, [SearchHint])] = []
+            while let result = try await group.next() {
+                indexed.append(result)
+            }
+            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var merged: OrderedSet<SearchHint> = []
+        for batch in perVariant {
+            for hint in batch { merged.append(hint) }
         }
 
         return Array(merged.prefix(Self.hintsLimit))

@@ -11,6 +11,13 @@ import JellyfinAPI
 
 extension SearchHint {
 
+    /// Stable identifier suitable for SwiftUI `ForEach`. Falls back to a
+    /// composite key when `id` is nil so we never collide on `hashValue`.
+    var compositeID: String {
+        if let id { return id }
+        return "\(type?.rawValue ?? "_")-\(name ?? "")-\(productionYear ?? 0)"
+    }
+
     /// Build a stub `BaseItemDto` suitable for routing to `ItemView`.
     /// The destination view will fetch the full item by id.
     var asBaseItemDto: BaseItemDto {
